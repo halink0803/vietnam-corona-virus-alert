@@ -2,7 +2,6 @@ package crawler
 
 import (
 	"crypto/tls"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -26,7 +25,7 @@ func (cr *Crawler) crawlerNews() (string, error) {
 	var (
 		news string
 	)
-	fmt.Println("start crawling")
+	log.Println("start crawling")
 	// Instantiate default collector
 	c := colly.NewCollector()
 
@@ -40,12 +39,12 @@ func (cr *Crawler) crawlerNews() (string, error) {
 
 	// Before making a request print "Visiting ..."
 	c.OnRequest(func(r *colly.Request) {
-		fmt.Println("Visiting", r.URL.String())
+		log.Println("Visiting", r.URL.String())
 	})
 
 	// Set error handler
 	c.OnError(func(r *colly.Response, err error) {
-		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+		log.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
 
 	if err := c.Visit("https://ncov.moh.gov.vn/"); err != nil {

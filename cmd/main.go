@@ -130,8 +130,14 @@ Bot invite link
 	}
 
 	if m.Content == "cva!about" {
+		log.Println(m.ChannelID)
 		if _, err := s.ChannelMessageSend(m.ChannelID, AboutMessage); err != nil {
 			log.Println(err)
 		}
 	}
+}
+
+func sendMessageToChannel(s *discordgo.Session, channelID, message string) error {
+	_, err := s.ChannelMessageSend(channelID, message)
+	return err
 }
