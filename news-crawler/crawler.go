@@ -3,6 +3,7 @@ package crawler
 import (
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gocolly/colly"
@@ -21,7 +22,10 @@ func NewCrawler(l *zap.SugaredLogger) *Crawler {
 	}
 }
 
-func (cr *Crawler) crawlerNews() {
+func (cr *Crawler) crawlerNews() (string, error) {
+	var (
+		news string
+	)
 	fmt.Println("start crawling")
 	// Instantiate default collector
 	c := colly.NewCollector()
@@ -31,8 +35,7 @@ func (cr *Crawler) crawlerNews() {
 	})
 
 	c.OnHTML(".timeline-sec > ul:first-child > li", func(e *colly.HTMLElement) {
-		fmt.Println(e.ChildText(".timeline-head"))
-		fmt.Println(e.ChildText("p"))
+		news = e.ChildText("p")
 	})
 
 	// Before making a request print "Visiting ..."
@@ -45,10 +48,15 @@ func (cr *Crawler) crawlerNews() {
 		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
 
-	c.Visit("https://ncov.moh.gov.vn/")
+	if err := c.Visit("https://ncov.moh.gov.vn/"); err != nil {
+		log.Println(err)
+		return "", err
+	}
+	c.Wait()
+	return news, nil
 }
 
 // Start the crawl
-func (cr *Crawler) Start() {
-	cr.crawlerNews()
+func (cr *Crawler) Start() (string, error) {
+	return cr.crawlerNews()
 }

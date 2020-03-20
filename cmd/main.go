@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	crawler "github.com/halink0803/corona-alerts-bot/news-crawler"
@@ -13,7 +14,8 @@ import (
 )
 
 const (
-	botKeyFlag = "bot-key"
+	botKeyFlag    string = "bot-key"
+	sleepDuration        = 1 * time.Minute
 )
 
 func main() {
@@ -24,7 +26,7 @@ func main() {
 	app.Flags = append(
 		app.Flags,
 		&cli.StringFlag{
-			Name:    "bot-key",
+			Name:    botKeyFlag,
 			Usage:   "key for the bot",
 			EnvVars: []string{"BOT_KEY"},
 		},
@@ -36,7 +38,7 @@ func main() {
 }
 
 func run(c *cli.Context) error {
-	botKey := c.String("bot-key")
+	botKey := c.String(botKeyFlag)
 	fmt.Println(botKey)
 	sugar, flush, err := NewSugaredLogger(c)
 	if err != nil {
@@ -44,7 +46,6 @@ func run(c *cli.Context) error {
 	}
 	defer flush()
 	crawler := crawler.NewCrawler(sugar)
-	crawler.Start()
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + botKey)
 	if err != nil {
@@ -55,12 +56,31 @@ func run(c *cli.Context) error {
 	// Register the messageCreate func as a callback for MessageCreate events.
 	dg.AddHandler(messageCreate)
 
+	// Register guildCreate as a callback for the guildCreate events.
+	dg.AddHandler(guildCreate)
+
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
 		fmt.Println("error opening connection,", err)
 		return err
 	}
+
+	latestNews := ""
+	go func() {
+		for {
+			news, err := crawler.Start()
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			if latestNews != news {
+				latestNews = news
+				log.Println(latestNews)
+			}
+			time.Sleep(sleepDuration)
+		}
+	}()
 
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
@@ -73,21 +93,43 @@ func run(c *cli.Context) error {
 }
 
 // This function will be called (due to AddHandler above) every time a new
+// guild is joined.
+func guildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
+
+	if event.Guild.Unavailable {
+		return
+	}
+
+	for _, channel := range event.Guild.Channels {
+		if channel.ID == event.Guild.ID {
+			if _, err := s.ChannelMessageSend(channel.ID, "Airhorn is ready! Type !airhorn while in a voice channel to play a sound."); err != nil {
+				log.Println(err)
+			}
+			return
+		}
+	}
+}
+
+// This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the autenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+
+	const (
+		AboutMessage = `
+		Bot invite link
+		https://discordapp.com/oauth2/authorize?client_id=689005737015377920&permissions=2048&scope=bot
+		`
+	)
 
 	// Ignore all messages created by the bot itself
 	// This isn't required in this specific example but it's a good practice.
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
-	// If the message is "ping" reply with "Pong!"
-	if m.Content == "ping" {
-		s.ChannelMessageSend(m.ChannelID, "Pong!")
-	}
 
-	// If the message is "pong" reply with "Ping!"
-	if m.Content == "pong" {
-		s.ChannelMessageSend(m.ChannelID, "Ping!")
+	if m.Content == "cva!about" {
+		if _, err := s.ChannelMessageSend(m.ChannelID, AboutMessage); err != nil {
+			log.Println(err)
+		}
 	}
 }
