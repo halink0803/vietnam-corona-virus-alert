@@ -39,7 +39,6 @@ func main() {
 
 func run(c *cli.Context) error {
 	botKey := c.String(botKeyFlag)
-	fmt.Println(botKey)
 	sugar, flush, err := NewSugaredLogger(c)
 	if err != nil {
 		return err
@@ -116,8 +115,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	const (
 		AboutMessage = `
-		Bot invite link
-		https://discordapp.com/oauth2/authorize?client_id=689005737015377920&permissions=2048&scope=bot
+		>>> **Corona Virus Alert About**
+Send alert about new cases in Vietnam
+Source from Vietnam Ministry of Health: https://ncov.moh.gov.vn
+Bot invite link
+<https://discordapp.com/api/oauth2/authorize?client_id=689005737015377920&permissions=18432&scope=bot>
 		`
 	)
 
