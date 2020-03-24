@@ -5,13 +5,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	errorLevel = "error"
-	warnLevel  = "warn"
-	fatalLevel = "fatal"
-	infoLevel  = "info"
-)
-
 type syncer interface {
 	Sync() error
 }

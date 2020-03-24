@@ -10,12 +10,17 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	crawler "github.com/halink0803/corona-alerts-bot/news-crawler"
+	"github.com/halink0803/corona-alerts-bot/news-crawler/storage/sqlite"
 	cli "github.com/urfave/cli/v2"
 )
 
 const (
 	botKeyFlag    string = "bot-key"
 	sleepDuration        = 1 * time.Minute
+)
+
+var (
+	supportedChannels = []string{"689719240462172313"}
 )
 
 func main() {
@@ -45,6 +50,10 @@ func run(c *cli.Context) error {
 	}
 	defer flush()
 	crawler := crawler.NewCrawler(sugar)
+	storage, err := sqlite.NewSqliteStorage()
+	if err != nil {
+		return err
+	}
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + botKey)
 	if err != nil {
@@ -55,9 +64,6 @@ func run(c *cli.Context) error {
 	// Register the messageCreate func as a callback for MessageCreate events.
 	dg.AddHandler(messageCreate)
 
-	// Register guildCreate as a callback for the guildCreate events.
-	dg.AddHandler(guildCreate)
-
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
@@ -65,16 +71,30 @@ func run(c *cli.Context) error {
 		return err
 	}
 
-	latestNews := ""
+	latestNews, err := storage.GetLatestNews()
+	if err != nil {
+		return err
+	}
+
 	go func() {
+		var (
+			err  error
+			news string
+		)
 		for {
-			news, err := crawler.Start()
+			news, err = crawler.Start()
 			if err != nil {
 				log.Println(err)
 				break
 			}
 			if latestNews != news {
 				latestNews = news
+				err := storage.StoreNews(news)
+				if err != nil {
+					log.Println("failed to store news", err)
+					break
+				}
+				sendMessageToChannel(dg, latestNews)
 				log.Println(latestNews)
 			}
 			time.Sleep(sleepDuration)
@@ -89,24 +109,6 @@ func run(c *cli.Context) error {
 
 	// Cleanly close down the Discord session.
 	return dg.Close()
-}
-
-// This function will be called (due to AddHandler above) every time a new
-// guild is joined.
-func guildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
-
-	if event.Guild.Unavailable {
-		return
-	}
-
-	for _, channel := range event.Guild.Channels {
-		if channel.ID == event.Guild.ID {
-			if _, err := s.ChannelMessageSend(channel.ID, "Airhorn is ready! Type !airhorn while in a voice channel to play a sound."); err != nil {
-				log.Println(err)
-			}
-			return
-		}
-	}
 }
 
 // This function will be called (due to AddHandler above) every time a new
@@ -135,9 +137,20 @@ Bot invite link
 			log.Println(err)
 		}
 	}
+
+	if m.Content == "cva!subscribe" {
+		supportedChannels = append(supportedChannels, m.ChannelID)
+		log.Printf("subscribed channel %s to alert", m.ChannelID)
+	}
 }
 
-func sendMessageToChannel(s *discordgo.Session, channelID, message string) error {
-	_, err := s.ChannelMessageSend(channelID, message)
-	return err
+func sendMessageToChannel(s *discordgo.Session, message string) {
+	// make it quote
+	message = ">>> " + message
+	for _, channelID := range supportedChannels {
+		_, err := s.ChannelMessageSend(channelID, message)
+		if err != nil {
+			log.Println(err)
+		}
+	}
 }
