@@ -1,5 +1,3 @@
 runtime: go112
 
-entrypoint: ./cmd --bot-key=Njg5MDA1NzM3MDE1Mzc3OTIw.XnUHRw.HeJsbnzG-XYhn6rSxe76p0byGeM
-
 main: ./cmd

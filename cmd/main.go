@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/halink0803/corona-alerts-bot/http"
 	crawler "github.com/halink0803/corona-alerts-bot/news-crawler"
 	"github.com/halink0803/corona-alerts-bot/news-crawler/storage/sqlite"
 	cli "github.com/urfave/cli/v2"
@@ -36,6 +37,7 @@ func main() {
 			EnvVars: []string{"BOT_KEY"},
 		},
 	)
+	app.Flags = append(app.Flags, http.NewHTTPCliFlags(8080)...)
 
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
@@ -98,6 +100,15 @@ func run(c *cli.Context) error {
 				log.Println(latestNews)
 			}
 			time.Sleep(sleepDuration)
+		}
+	}()
+
+	host := http.NewHTTPAddressFromContext(c)
+	s := http.NewServer(host)
+	go func() {
+		err := s.Run()
+		if err != nil {
+			log.Panic(err)
 		}
 	}()
 
